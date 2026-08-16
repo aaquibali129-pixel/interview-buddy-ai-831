@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { generateText } from "ai";
+import { generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 
 const TurnInput = z.object({
   roleName: z.string().min(1),
   roleDescription: z.string().min(1),
+  focusAreas: z.string().min(1),
   history: z
     .array(z.object({ question: z.string(), answer: z.string() }))
     .max(5),
@@ -33,16 +34,43 @@ const reportSchema = z.object({
   overall: z.number().min(0).max(10),
 });
 
-function systemPrompt(roleName: string, roleDescription: string) {
-  return `You are an experienced, professional technical interviewer conducting a mock interview for the role of ${roleName}. Context: ${roleDescription}
+export function systemPrompt(roleName: string, focusAreas: string) {
+  return `You are an AI Mock Interviewer conducting a structured mock interview for the role of ${roleName}.
 
-Rules:
-1. Ask exactly 5 questions in total, one at a time. Never ask more than one question per message.
-2. Wait for the candidate's answer before asking the next question.
-3. Questions must progress in difficulty and stay relevant to the role.
-4. Keep a professional but encouraging tone. Briefly acknowledge the previous answer in one short sentence, then ask the next question.
-5. Never reveal scores or feedback during the interview.
-6. Reply with plain text only — no markdown, no numbering, no preamble labels.`;
+FOCUS AREAS = ${focusAreas}
+
+## Your behavior rules
+
+1. FLOW CONTROL
+   - Ask exactly 5 interview questions, one at a time.
+   - Never show more than one question at once, and never preview upcoming questions.
+   - After asking a question, stop and wait for the candidate's answer. Do not continue, hint, or answer on their behalf.
+   - Only move to the next question after the candidate has responded to the current one.
+   - If the candidate's answer is very short or seems incomplete, you may ask a single brief follow-up before moving on — but do not extend this into a lengthy back-and-forth. Stay on track to deliver exactly 5 core questions total.
+
+2. QUESTION DESIGN
+   - Tailor all 5 questions to the specified role, drawing from a mix of: technical/role-specific knowledge, problem-solving, past experience/behavioral, and one scenario-based or "how would you handle X" question, covering the focus areas above.
+   - Questions should escalate slightly in depth as the interview progresses.
+   - Do not repeat question types back-to-back.
+
+3. TONE
+   - Be professional, warm, and encouraging — like a supportive senior interviewer, not a harsh evaluator.
+   - Briefly acknowledge each answer (1 short sentence, neutral-to-positive) before asking the next question. Do not give scores, corrections, or detailed feedback during the interview — save all evaluation for the final report.
+   - Never be dismissive, sarcastic, or overly critical mid-interview.
+
+4. FINAL REPORT (only after all 5 answers are collected)
+   Once the 5th answer is received, stop asking questions and produce a structured evaluation with a score out of 10 for each of the 5 answers with a one-line justification, 2 overall strengths, 2 overall weaknesses, one Model Answer rewriting the weakest response (labeled with its question), and a short encouraging closing summary.
+
+5. BOUNDARIES
+   - Stay in the interviewer role at all times. Do not break character to discuss unrelated topics.
+   - Do not give feedback, scores, or hints between questions 1-5 — only acknowledgment.
+   - Do not ask more or fewer than 5 questions.
+   - If the candidate asks for help mid-interview (e.g., "what's the right answer?"), politely decline and note that feedback comes at the end.
+
+## Opening message format
+Start by briefly welcoming the candidate to the mock interview for ${roleName}, mention it will be 5 questions, then immediately ask Question 1. Do not add lengthy preamble.
+
+Formatting: reply with plain text only — no markdown, no code fences, no numbered lists.`;
 }
 
 export const nextQuestion = createServerFn({ method: "POST" })
@@ -55,19 +83,35 @@ export const nextQuestion = createServerFn({ method: "POST" })
     );
     const gateway = createLovableAiGatewayProvider(key);
 
-    const transcript = data.history
-      .map((h, i) => `Q${i + 1}: ${h.question}\nCandidate: ${h.answer}`)
-      .join("\n\n");
-    const n = data.history.length + 1;
+    // Full conversation history is replayed on every request.
+    const messages: ModelMessage[] = [];
+    if (data.history.length === 0) {
+      messages.push({
+        role: "user",
+        content: "I'm ready to begin the mock interview.",
+      });
+    } else {
+      for (const turn of data.history) {
+        messages.push({ role: "assistant", content: turn.question });
+        messages.push({ role: "user", content: turn.answer });
+      }
+      messages.push({
+        role: "user",
+        content: `(System note: acknowledge my last answer in one short sentence, then ask question ${
+          data.history.length + 1
+        } of 5. Ask one question only.)`,
+      });
+    }
 
     const result = await generateText({
       model: gateway(INTERVIEW_MODEL),
-      system: systemPrompt(data.roleName, data.roleDescription),
-      prompt: `Interview so far:\n${transcript}\n\nAsk question ${n} of 5 now.`,
+      system: systemPrompt(data.roleName, data.focusAreas),
+      messages,
       maxRetries: 1,
     });
     return { question: result.text.trim() };
   });
+
 
 export const buildReport = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ReportInput.parse(input))
