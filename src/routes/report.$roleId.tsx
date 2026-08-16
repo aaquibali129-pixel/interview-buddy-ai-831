@@ -38,6 +38,10 @@ function scoreTone(score: number) {
   return "text-destructive";
 }
 
+function cleanQuestion(q: string) {
+  return q.replace(/^\s*(?:Q(?:uestion)?\s*\d+\s*[:.)-]\s*)/i, "").trim();
+}
+
 function ReportScreen() {
   const { role } = Route.useLoaderData();
   const [session, setSession] = useState<StoredSession | null | undefined>(undefined);
@@ -102,7 +106,7 @@ function ReportScreen() {
                     <span className="mr-2 text-xs uppercase tracking-widest text-muted-foreground">
                       Q{i + 1}
                     </span>
-                    {s.question}
+                    {cleanQuestion(s.question)}
                   </p>
                   <span
                     className={`shrink-0 font-display text-2xl font-bold tabular-nums ${scoreTone(s.score)}`}
@@ -157,7 +161,7 @@ function ReportScreen() {
             response
           </h2>
           <p className="mt-3 text-sm font-medium text-foreground">
-            Q{report.modelAnswer.questionIndex + 1}: {report.modelAnswer.question}
+            Q{report.modelAnswer.questionIndex + 1}: {cleanQuestion(report.modelAnswer.question)}
           </p>
           <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
             {report.modelAnswer.answer}
