@@ -43,9 +43,9 @@ function InterviewScreen() {
   const askNext = useServerFn(nextQuestion);
   const makeReport = useServerFn(buildReport);
 
-  const [turns, setTurns] = useState<Turn[]>([{ role: "ai", text: role.seedQuestion }]);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [pairs, setPairs] = useState<QAPair[]>([]);
-  const [current, setCurrent] = useState(role.seedQuestion);
+  const [current, setCurrent] = useState("");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -54,6 +54,39 @@ function InterviewScreen() {
 
   const index = pairs.length; // 0-based index of the question being answered
   const bottomRef = useRef<HTMLDivElement>(null);
+  const started = useRef(false);
+
+  // Opening message (welcome + question 1) comes from the AI interviewer.
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    let cancelled = false;
+    setBusy(true);
+    askNext({
+      data: {
+        roleName: role.name,
+        roleDescription: role.description,
+        focusAreas: role.focusAreas,
+        history: [],
+      },
+    })
+      .then(({ question }) => {
+        if (cancelled) return;
+        setCurrent(question);
+        setTurns([{ role: "ai", text: question }]);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCurrent(role.seedQuestion);
+        setTurns([{ role: "ai", text: role.seedQuestion }]);
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [askNext, role]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -74,7 +107,7 @@ function InterviewScreen() {
 
   async function submit() {
     const answer = draft.trim();
-    if (!answer || busy || finishing) return;
+    if (!answer || busy || finishing || !current) return;
     setError(null);
     setDraft("");
     const spent = seconds;
@@ -106,6 +139,7 @@ function InterviewScreen() {
         data: {
           roleName: role.name,
           roleDescription: role.description,
+          focusAreas: role.focusAreas,
           history: updated.map((p) => ({ question: p.question, answer: p.answer })),
         },
       });
