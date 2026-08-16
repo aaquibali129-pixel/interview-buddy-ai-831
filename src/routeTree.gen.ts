@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InterviewRoleIdRouteImport } from './routes/interview.$roleId'
+import { Route as ReportRoleIdRouteImport } from './routes/report.$roleId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InterviewRoleIdRoute = InterviewRoleIdRouteImport.update({
+  id: '/interview/$roleId',
+  path: '/interview/$roleId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportRoleIdRoute = ReportRoleIdRouteImport.update({
+  id: '/report/$roleId',
+  path: '/report/$roleId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/interview/$roleId': typeof InterviewRoleIdRoute
+  '/report/$roleId': typeof ReportRoleIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/interview/$roleId': typeof InterviewRoleIdRoute
+  '/report/$roleId': typeof ReportRoleIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/interview/$roleId': typeof InterviewRoleIdRoute
+  '/report/$roleId': typeof ReportRoleIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/interview/$roleId' | '/report/$roleId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/interview/$roleId' | '/report/$roleId'
+  id: '__root__' | '/' | '/interview/$roleId' | '/report/$roleId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InterviewRoleIdRoute: typeof InterviewRoleIdRoute
+  ReportRoleIdRoute: typeof ReportRoleIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/interview/$roleId': {
+      id: '/interview/$roleId'
+      path: '/interview/$roleId'
+      fullPath: '/interview/$roleId'
+      preLoaderRoute: typeof InterviewRoleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/report/$roleId': {
+      id: '/report/$roleId'
+      path: '/report/$roleId'
+      fullPath: '/report/$roleId'
+      preLoaderRoute: typeof ReportRoleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InterviewRoleIdRoute: InterviewRoleIdRoute,
+  ReportRoleIdRoute: ReportRoleIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
